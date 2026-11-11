@@ -1,0 +1,36 @@
+# 离线可用：两个镜像都只依赖 python:3.11-slim 基础镜像与标准库，
+# 构建与运行过程中不访问任何外部包源。
+# 离线主机请先在有网环境执行：docker compose pull && docker compose build，
+# 再把镜像（docker save）或整个目录带到离线主机。
+services:
+  manufacturer:
+    build: ./manufacturer
+    container_name: qc-manufacturer
+    ports:
+      - "8081:8081"
+    volumes:
+      - mfg-data:/app/data
+    restart: unless-stopped
+
+  warehouse:
+    build: ./warehouse
+    container_name: qc-warehouse
+    ports:
+      - "8080:8080"
+    environment:
+      # 浏览器使用 http://localhost:8081 访问示例站；
+      # 容器内出站请求改写到 compose 网络中的 manufacturer 服务。
+      URL_MAP_FROM: "http://localhost:8081"
+      URL_MAP_TO: "http://manufacturer:8081"
+      RECONCILE_INTERVAL: "12"
+      RECONCILE_BACKOFF: "3"
+    volumes:
+      - wh-data:/app/data
+    depends_on:
+      manufacturer:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mfg-data:
+  wh-data:
